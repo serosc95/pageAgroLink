@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Iniciar sesión · ADD-COM</title>
+  <link rel="icon" href="/assets/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="wrap">
+    <div id="site-header"></div>
+    <main class="page form-card">
+      <p class="eyebrow">Acceso</p>
+      <h1>Iniciar sesión</h1>
+      <p class="lead">Usa tu correo de vendedor o comprador.</p>
+      <form id="form" class="card" novalidate>
+        <label>
+          <span class="lbl">Correo</span>
+          <input name="email" type="email" required autocomplete="email">
+        </label>
+        <label>
+          <span class="lbl">Contraseña</span>
+          <input name="password" type="password" required autocomplete="current-password">
+        </label>
+        <button class="btn btn-gold btn-block" type="submit">Entrar</button>
+        <p class="muted" style="margin-top:16px">
+          ¿Eres productor? <a href="/registro.html">Regístrate</a> ·
+          ¿Compras? <a href="/registro-comprador.html">Crea tu cuenta</a>
+        </p>
+      </form>
+    </main>
+  </div>
+  <script src="/js/config.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/ui.js"></script>
+  <script>
+    ui.renderHeader();
+    const next = new URLSearchParams(location.search).get('next') || '';
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      try {
+        const data = await api.post('/api/auth/login', {
+          email: form.email.value,
+          password: form.password.value,
+        });
+        auth.setSession(data.token, data.usuario);
+        if (next.startsWith('/')) location.href = next;
+        else location.href = data.usuario.rol === 'vendedor' ? '/panel.html' : '/catalogo.html';
+      } catch (err) {
+        ui.toast(err.message, 'error');
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Catálogo de vendedores · ADD-COM</title>
+  <link rel="icon" href="/assets/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="wrap">
+    <div id="site-header"></div>
+    <main class="page">
+      <p class="eyebrow">Flujo compradores</p>
+      <h1>Vendedores en ADD-COM</h1>
+      <p class="lead">Elige un productor para ver sus productos, precios y abrir el chat.</p>
+      <div id="list" class="grid" style="margin-top:24px"></div>
+    </main>
+    <footer class="site">ADD-COM · Catálogo</footer>
+  </div>
+  <script src="/js/config.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/ui.js"></script>
+  <script>
+    ui.renderHeader();
+    (async function () {
+      const list = document.getElementById('list');
+      try {
+        const { vendedores } = await api.get('/api/vendedores');
+        if (!vendedores.length) {
+          list.innerHTML = '<div class="card empty">Aún no hay vendedores. Sé el primero en <a href="/registro.html">registrarte</a>.</div>';
+          return;
+        }
+        list.innerHTML = vendedores.map((v) => {
+          const initial = ui.escapeHtml((v.nombres || '?').charAt(0).toUpperCase());
+          const photo = v.fotoPerfil
+            ? `<img class="avatar" src="${ui.escapeHtml(v.fotoPerfil)}" alt="">`
+            : `<div class="avatar-fallback">${initial}</div>`;
+          return `
+            <a class="card seller-card" href="/vendedor.html?id=${v.id}">
+              ${photo}
+              <strong>${ui.escapeHtml(v.nombres)}</strong>
+              <span class="muted">${ui.escapeHtml(v.ubicacion || 'Ubicación no publicada')}</span>
+              <span class="tag">${v.productosCount} producto${v.productosCount === 1 ? '' : 's'}</span>
+            </a>`;
+        }).join('');
+      } catch (err) {
+        list.innerHTML = `<div class="card empty">${ui.escapeHtml(err.message)}</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>

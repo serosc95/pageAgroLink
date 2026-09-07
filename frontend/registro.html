@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Registro de vendedor · ADD-COM</title>
+  <link rel="icon" href="/assets/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="wrap">
+    <div id="site-header"></div>
+    <main class="page form-card">
+      <p class="eyebrow">Flujo vendedores</p>
+      <h1>Registra tu finca o puesto</h1>
+      <p class="lead">Tus datos y el primer producto quedan publicados en el catálogo.</p>
+      <div class="steps" aria-hidden="true">
+        <div class="step-dot on" id="dot1"></div>
+        <div class="step-dot" id="dot2"></div>
+      </div>
+      <form id="form" class="card" novalidate>
+        <div id="step-1">
+          <label>
+            <span class="lbl">Identificación (cédula o NIT)</span>
+            <input name="identificacion" required minlength="5" maxlength="20" autocomplete="off">
+          </label>
+          <label>
+            <span class="lbl">Nombres completos</span>
+            <input name="nombres" required minlength="3" maxlength="150" autocomplete="name">
+          </label>
+          <div class="two-col">
+            <label>
+              <span class="lbl">Teléfono</span>
+              <input name="telefono" required maxlength="20" inputmode="tel">
+            </label>
+            <label>
+              <span class="lbl">WhatsApp (opcional)</span>
+              <input name="whatsapp" maxlength="20" inputmode="tel">
+            </label>
+          </div>
+          <label>
+            <span class="lbl">Correo (Gmail u otro)</span>
+            <input name="email" type="email" required maxlength="150" autocomplete="email">
+          </label>
+          <label>
+            <span class="lbl">Contraseña</span>
+            <input name="password" type="password" required minlength="8" autocomplete="new-password" placeholder="Mínimo 8 caracteres, letras y números">
+          </label>
+          <label>
+            <span class="lbl">Ubicación</span>
+            <input name="ubicacion" required maxlength="255" placeholder="Municipio, departamento">
+          </label>
+          <button type="button" class="btn btn-gold" id="next">Continuar al producto</button>
+        </div>
+        <div id="step-2" hidden>
+          <label>
+            <span class="lbl">Nombre del producto</span>
+            <input name="productoNombre" required maxlength="150">
+          </label>
+          <label>
+            <span class="lbl">Precio (COP)</span>
+            <input name="precio" type="number" min="0" step="100" required>
+          </label>
+          <label>
+            <span class="lbl">Especificaciones</span>
+            <textarea name="especificaciones" required minlength="5" maxlength="2000" placeholder="Variedad, unidad de venta, temporada, condiciones…"></textarea>
+          </label>
+          <label>
+            <span class="lbl">Foto del producto</span>
+            <input name="fotoFile" type="file" accept="image/jpeg,image/png,image/webp" required>
+            <img class="preview" id="preview" alt="Vista previa">
+          </label>
+          <div class="two-col">
+            <button type="button" class="btn btn-ghost" id="back">Volver</button>
+            <button type="submit" class="btn btn-green" id="submit">Publicar perfil</button>
+          </div>
+        </div>
+      </form>
+    </main>
+  </div>
+  <script src="/js/config.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/ui.js"></script>
+  <script>
+    ui.renderHeader();
+    const form = document.getElementById('form');
+    const s1 = document.getElementById('step-1');
+    const s2 = document.getElementById('step-2');
+    let fotoData = null;
+
+    document.getElementById('next').addEventListener('click', () => {
+      const required = ['identificacion', 'nombres', 'telefono', 'email', 'password', 'ubicacion'];
+      for (const name of required) {
+        const el = form[name];
+        if (!el.checkValidity()) {
+          el.reportValidity();
+          return;
+        }
+      }
+      s1.hidden = true;
+      s2.hidden = false;
+      document.getElementById('dot2').classList.add('on');
+    });
+    document.getElementById('back').addEventListener('click', () => {
+      s2.hidden = true;
+      s1.hidden = false;
+      document.getElementById('dot2').classList.remove('on');
+    });
+
+    form.fotoFile.addEventListener('change', async () => {
+      const file = form.fotoFile.files[0];
+      if (!file) return;
+      try {
+        fotoData = await ui.fileToDataUrl(file);
+        const prev = document.getElementById('preview');
+        prev.src = fotoData;
+        prev.classList.add('show');
+      } catch (err) {
+        fotoData = null;
+        ui.toast(err.message, 'error');
+        form.fotoFile.value = '';
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!fotoData) {
+        ui.toast('Adjunta una foto del producto', 'error');
+        return;
+      }
+      const btn = document.getElementById('submit');
+      btn.disabled = true;
+      try {
+        const data = await api.post('/api/auth/registro-vendedor', {
+          identificacion: form.identificacion.value,
+          nombres: form.nombres.value,
+          telefono: form.telefono.value,
+          whatsapp: form.whatsapp.value,
+          email: form.email.value,
+          password: form.password.value,
+          ubicacion: form.ubicacion.value,
+          productoNombre: form.productoNombre.value,
+          precio: form.precio.value,
+          especificaciones: form.especificaciones.value,
+          foto: fotoData,
+        });
+        auth.setSession(data.token, data.usuario);
+        ui.toast('Perfil publicado');
+        location.href = '/panel.html';
+      } catch (err) {
+        ui.showFieldErrors(form, err.fields);
+        ui.toast(err.message, 'error');
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

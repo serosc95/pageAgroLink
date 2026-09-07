@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel del vendedor · ADD-COM</title>
+  <link rel="icon" href="/assets/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="wrap">
+    <div id="site-header"></div>
+    <main class="page">
+      <p class="eyebrow">Tu parcela</p>
+      <h1 id="hello">Panel</h1>
+      <p class="lead">Administra productos y responde el chat de compradores.</p>
+      <p>
+        <a class="btn btn-ghost btn-sm" href="/inbox.html">Bandeja de chat</a>
+        <a class="btn btn-ghost btn-sm" id="public-link" href="#">Ver ficha pública</a>
+      </p>
+      <div class="layout-vendor" style="margin-top:20px">
+        <section>
+          <h2>Tus productos</h2>
+          <div id="products" class="products"></div>
+        </section>
+        <form id="form" class="card">
+          <h3>Añadir producto</h3>
+          <label><span class="lbl">Nombre</span><input name="nombre" required maxlength="150"></label>
+          <label><span class="lbl">Precio (COP)</span><input name="precio" type="number" min="0" step="100" required></label>
+          <label><span class="lbl">Especificaciones</span><textarea name="especificaciones" required minlength="5"></textarea></label>
+          <label>
+            <span class="lbl">Foto (opcional)</span>
+            <input name="fotoFile" type="file" accept="image/jpeg,image/png,image/webp">
+          </label>
+          <button class="btn btn-green btn-block" type="submit">Guardar</button>
+        </form>
+      </div>
+    </main>
+  </div>
+  <script src="/js/config.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/ui.js"></script>
+  <script>
+    ui.renderHeader();
+    const me = auth.currentUser();
+    if (!auth.token() || !me || me.rol !== 'vendedor') {
+      location.href = '/login.html?next=/panel.html';
+    } else {
+      document.getElementById('hello').textContent = 'Hola, ' + me.nombres.split(' ')[0];
+      document.getElementById('public-link').href = '/vendedor.html?id=' + me.id;
+    }
+
+    async function load() {
+      const { productos } = await api.get('/api/productos');
+      const box = document.getElementById('products');
+      box.innerHTML = productos.map((p) => `
+        <article class="card product" data-id="${p.id}">
+          ${p.foto ? `<img src="${ui.escapeHtml(p.foto)}" alt="">` : `<div class="ph">🌾</div>`}
+          <div>
+            <h3>${ui.escapeHtml(p.nombre)}</h3>
+            <p class="muted">${ui.escapeHtml(p.especificaciones || '')}</p>
+          </div>
+          <div>
+            <div class="price">${ui.money(p.precio)}</div>
+            <button type="button" class="linkish del">Eliminar</button>
+          </div>
+        </article>
+      `).join('') || '<p class="muted">Aún no tienes productos.</p>';
+      box.querySelectorAll('.del').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = btn.closest('[data-id]').dataset.id;
+          if (!confirm('¿Eliminar este producto?')) return;
+          try {
+            await api.del('/api/productos/' + id);
+            ui.toast('Producto eliminado');
+            load();
+          } catch (err) {
+            ui.toast(err.message, 'error');
+          }
+        });
+      });
+    }
+
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      let foto;
+      if (form.fotoFile.files[0]) {
+        try {
+          foto = await ui.fileToDataUrl(form.fotoFile.files[0]);
+        } catch (err) {
+          ui.toast(err.message, 'error');
+          return;
+        }
+      }
+      try {
+        await api.post('/api/productos', {
+          nombre: form.nombre.value,
+          precio: form.precio.value,
+          especificaciones: form.especificaciones.value,
+          foto,
+        });
+        form.reset();
+        ui.toast('Producto publicado');
+        load();
+      } catch (err) {
+        ui.showFieldErrors(form, err.fields);
+        ui.toast(err.message, 'error');
+      }
+    });
+
+    load().catch((err) => ui.toast(err.message, 'error'));
+  </script>
+</body>
+</html>

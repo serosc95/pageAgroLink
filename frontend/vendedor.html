@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vendedor · ADD-COM</title>
+  <link rel="icon" href="/assets/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="wrap">
+    <div id="site-header"></div>
+    <main class="page layout-vendor">
+      <section>
+        <div id="profile"></div>
+        <h2>Productos</h2>
+        <div id="products" class="products"></div>
+      </section>
+      <aside class="chat-panel" id="chat-panel">
+        <div class="chat-head">
+          <strong>Chat con el vendedor</strong>
+          <p class="muted" id="chat-hint" style="margin:4px 0 0;font-size:0.85rem">Conversación en tiempo real, sin salir del sitio.</p>
+        </div>
+        <div class="chat-log" id="chat-log"></div>
+        <form class="chat-form" id="chat-form">
+          <input name="contenido" maxlength="2000" placeholder="Escribe un mensaje…" autocomplete="off" required>
+          <button class="btn btn-gold btn-sm" type="submit">Enviar</button>
+        </form>
+      </aside>
+    </main>
+  </div>
+  <script src="/js/config.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/ui.js"></script>
+  <script src="/js/chat.js"></script>
+  <script>
+    ui.renderHeader();
+    const params = new URLSearchParams(location.search);
+    const vendorId = Number(params.get('id'));
+    const me = auth.currentUser();
+    const log = document.getElementById('chat-log');
+    const hint = document.getElementById('chat-hint');
+
+    function bubble(m) {
+      const mine = me && m.remitenteId === me.id;
+      const el = document.createElement('div');
+      el.className = 'bubble ' + (mine ? 'me' : 'them');
+      el.textContent = m.contenido;
+      return el;
+    }
+
+    function renderHistory(mensajes) {
+      log.innerHTML = '';
+      mensajes.forEach((m) => log.appendChild(bubble(m)));
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function ensureBuyerSession() {
+      if (!auth.token()) {
+        const next = encodeURIComponent('/vendedor.html?id=' + vendorId);
+        hint.innerHTML = 'Para chatear <a href="/login.html?next=' + next + '">inicia sesión</a> o <a href="/registro-comprador.html?next=' + next + '">crea una cuenta de comprador</a>.';
+        document.getElementById('chat-form').querySelector('button').disabled = true;
+        return false;
+      }
+      if (me && me.rol === 'vendedor' && me.id === vendorId) {
+        hint.textContent = 'Este es tu perfil. Los compradores te escribirán aquí.';
+        document.getElementById('chat-form').querySelector('button').disabled = true;
+        return false;
+      }
+      if (me && me.rol === 'vendedor') {
+        hint.textContent = 'El chat de esta ficha es para compradores. Revisa tu bandeja.';
+        document.getElementById('chat-form').querySelector('button').disabled = true;
+        return false;
+      }
+      return true;
+    }
+
+    async function boot() {
+      if (!vendorId) {
+        document.getElementById('profile').innerHTML = '<p class="muted">Vendedor no indicado.</p>';
+        return;
+      }
+      try {
+        const { vendedor, productos } = await api.get('/api/vendedores/' + vendorId);
+        document.title = vendedor.nombres + ' · ADD-COM';
+        const tel = vendedor.telefono ? `<a href="tel:${ui.escapeHtml(vendedor.telefono)}">${ui.escapeHtml(vendedor.telefono)}</a>` : '';
+        const mail = `<a href="mailto:${ui.escapeHtml(vendedor.email)}">${ui.escapeHtml(vendedor.email)}</a>`;
+        const wa = vendedor.whatsapp
+          ? `<a href="https://wa.me/${ui.escapeHtml(String(vendedor.whatsapp).replace(/\D/g, ''))}" target="_blank" rel="noopener">WhatsApp</a>`
+          : '';
+        const loc = vendedor.ubicacion ? `<span>${ui.escapeHtml(vendedor.ubicacion)}</span>` : '';
+        document.getElementById('profile').innerHTML = `
+          <div class="profile-head card">
+            ${vendedor.fotoPerfil
+              ? `<img class="avatar" src="${ui.escapeHtml(vendedor.fotoPerfil)}" alt="">`
+              : `<div class="avatar-fallback">${ui.escapeHtml(vendedor.nombres.charAt(0))}</div>`}
+            <div>
+              <p class="eyebrow">Productor</p>
+              <h1>${ui.escapeHtml(vendedor.nombres)}</h1>
+              <div class="contacts">${[tel, mail, wa, loc].filter(Boolean).join('')}</div>
+            </div>
+          </div>`;
+        document.getElementById('products').innerHTML = productos.map((p) => `
+          <article class="card product">
+            ${p.foto ? `<img src="${ui.escapeHtml(p.foto)}" alt="">` : `<div class="ph">🌾</div>`}
+            <div>
+              <h3>${ui.escapeHtml(p.nombre)}</h3>
+              <p class="muted">${ui.escapeHtml(p.especificaciones || '')}</p>
+            </div>
+            <div class="price">${ui.money(p.precio)}</div>
+          </article>
+        `).join('') || '<p class="muted">Este vendedor aún no publicó productos.</p>';
+      } catch (err) {
+        document.getElementById('profile').innerHTML = `<p class="muted">${ui.escapeHtml(err.message)}</p>`;
+        return;
+      }
+
+      if (!ensureBuyerSession()) return;
+      chat.connect(vendorId, {
+        onHistory: renderHistory,
+        onMessage: (m) => {
+          log.appendChild(bubble(m));
+          log.scrollTop = log.scrollHeight;
+        },
+        onError: (msg) => ui.toast(msg, 'error'),
+        onNeedAuth: ensureBuyerSession,
+      });
+    }
+
+    document.getElementById('chat-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = e.target.contenido;
+      const text = input.value.trim();
+      if (!text) return;
+      try {
+        await chat.send(text);
+        input.value = '';
+      } catch (err) {
+        ui.toast(err.message, 'error');
+      }
+    });
+
+    boot();
+  </script>
+</body>
+</html>

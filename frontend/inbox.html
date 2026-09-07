@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bandeja · ADD-COM</title>
+  <link rel="icon" href="/assets/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="wrap">
+    <div id="site-header"></div>
+    <main class="page layout-vendor">
+      <section>
+        <p class="eyebrow">Mensajes</p>
+        <h1>Bandeja</h1>
+        <div id="threads" class="products"></div>
+      </section>
+      <aside class="chat-panel">
+        <div class="chat-head">
+          <strong id="chat-title">Selecciona una conversación</strong>
+        </div>
+        <div class="chat-log" id="chat-log"></div>
+        <form class="chat-form" id="chat-form" hidden>
+          <input name="contenido" maxlength="2000" placeholder="Responder…" autocomplete="off" required>
+          <button class="btn btn-gold btn-sm" type="submit">Enviar</button>
+        </form>
+      </aside>
+    </main>
+  </div>
+  <script src="/js/config.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/ui.js"></script>
+  <script src="/js/chat.js"></script>
+  <script>
+    ui.renderHeader();
+    if (!auth.requireLogin('/inbox.html')) { /* redirige a login */ }
+    const me = auth.currentUser();
+    const log = document.getElementById('chat-log');
+    let destId = null;
+
+    function bubble(m) {
+      const el = document.createElement('div');
+      el.className = 'bubble ' + (m.remitenteId === me.id ? 'me' : 'them');
+      el.textContent = m.contenido;
+      return el;
+    }
+
+    function openThread(otherId, name) {
+      destId = otherId;
+      document.getElementById('chat-title').textContent = name;
+      document.getElementById('chat-form').hidden = false;
+      chat.disconnect();
+      chat.connect(otherId, {
+        onHistory: (mensajes) => {
+          log.innerHTML = '';
+          mensajes.forEach((m) => log.appendChild(bubble(m)));
+          log.scrollTop = log.scrollHeight;
+        },
+        onMessage: (m) => {
+          log.appendChild(bubble(m));
+          log.scrollTop = log.scrollHeight;
+        },
+        onError: (msg) => ui.toast(msg, 'error'),
+      });
+    }
+
+    document.getElementById('chat-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = e.target.contenido;
+      try {
+        await chat.send(input.value);
+        input.value = '';
+      } catch (err) {
+        ui.toast(err.message, 'error');
+      }
+    });
+
+    (async function () {
+      try {
+        const { conversaciones } = await api.get('/api/mensajes');
+        const box = document.getElementById('threads');
+        if (!conversaciones.length) {
+          box.innerHTML = '<p class="muted">Aún no tienes conversaciones.</p>';
+          return;
+        }
+        box.innerHTML = conversaciones.map((c) => {
+          const otherId = me.rol === 'vendedor' ? c.compradorId : c.vendedorId;
+          const name = me.rol === 'vendedor' ? c.compradorNombre : c.vendedorNombre;
+          return `
+            <button type="button" class="card seller-card" data-id="${otherId}" data-name="${ui.escapeHtml(name)}" style="text-align:left;cursor:pointer;font:inherit;color:inherit">
+              <strong>${ui.escapeHtml(name)}</strong>
+              <span class="muted">${ui.escapeHtml(c.contenido)}</span>
+            </button>`;
+        }).join('');
+        box.querySelectorAll('button').forEach((btn) => {
+          btn.addEventListener('click', () => openThread(Number(btn.dataset.id), btn.dataset.name));
+        });
+      } catch (err) {
+        ui.toast(err.message, 'error');
+      }
+    })();
+  </script>
+</body>
+</html>

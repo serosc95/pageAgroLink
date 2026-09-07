@@ -1,0 +1,23 @@
+# Dependencias
+node_modules/
+
+# Entorno y secretos
+.env
+.env.local
+*.pem
+
+# Subidas de usuarios
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Sistema y editores
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+
+# Cobertura y temporales
+coverage/
+tmp/
+dist/

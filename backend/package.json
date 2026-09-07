@@ -1,0 +1,23 @@
+{
+  "name": "addcom-backend",
+  "version": "1.0.0",
+  "description": "API REST y WebSockets de ADD-COM (Node.js + PostgreSQL)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "migrate": "node scripts/migrate.js",
+    "seed": "node scripts/seed.js",
+    "setup": "node scripts/migrate.js && node scripts/seed.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1",
+    "ws": "^8.18.0"
+  }
+}
